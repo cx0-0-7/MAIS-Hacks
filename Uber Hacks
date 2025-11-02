@@ -1,0 +1,66 @@
+# ============================================
+# Uber Price Prediction Model
+# ============================================
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, r2_score
+
+# Load dataset
+df = pd.read_csv("UberDataset.csv")
+
+# Drop rows with missing key info
+df = df.dropna(subset=["START_DATE", "MILES", "START", "STOP"])
+
+# Convert dates
+df["START_DATE"] = pd.to_datetime(df["START_DATE"], errors="coerce")
+df["END_DATE"] = pd.to_datetime(df["END_DATE"], errors="coerce")
+
+# Feature engineering: trip duration (minutes)
+df["DURATION_MIN"] = (df["END_DATE"] - df["START_DATE"]).dt.total_seconds() / 60
+
+# Handle missing durations (replace with mean)
+df["DURATION_MIN"].fillna(df["DURATION_MIN"].mean(), inplace=True)
+
+# Create a synthetic price variable (if not available)
+# Example: base fare + per-mile cost + time cost + randomness
+df["PRICE"] = 2.5 + (1.2 * df["MILES"]) + (0.25 * df["DURATION_MIN"]) + np.random.normal(0, 2, len(df))
+
+# Encode categorical features
+for col in ["CATEGORY", "START", "STOP", "PURPOSE"]:
+    df[col] = df[col].fillna("Unknown")
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col])
+
+# Define features and target
+X = df[["MILES", "DURATION_MIN", "CATEGORY", "START", "STOP", "PURPOSE"]]
+y = df["PRICE"]
+
+# Split train/test
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train model
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Predict and evaluate
+y_pred = model.predict(X_test)
+mae = mean_absolute_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print(f"Mean Absolute Error: ${mae:.2f}")
+print(f"R² Score: {r2:.2f}")
+
+# Example: predict price for a new trip
+example = pd.DataFrame({
+    "MILES": [10],
+    "DURATION_MIN": [25],
+    "CATEGORY": [1],
+    "START": [5],
+    "STOP": [10],
+    "PURPOSE": [2]
+})
+predicted_price = model.predict(example)[0]
+print(f"Predicted Uber price for example trip: ${predicted_price:.2f}")
