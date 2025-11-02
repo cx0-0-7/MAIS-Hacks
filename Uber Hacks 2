@@ -1,0 +1,107 @@
+#STEP 1: IMPORT DEPENDENCIES
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from tensorflow import keras
+from tensorflow.keras import layers
+import matplotlib.pyplot as plt
+
+
+
+#STEP 2: LOAD YOUR DATASET
+# Load dataset
+df = pd.read_csv(r"C:\Users\Irene Rodriguez Moya\OneDrive - McGill University\Documents\Hackathons\MAIS Hackathon\UberDataset.csv")
+
+# Display first few rows and info
+print("✅ Data loaded successfully:")
+
+df["PRICE"] = df["MILES"] * 2.5 + np.random.normal(0, 2, len(df))
+
+# Quick check to confirm it worked
+print(df.head())
+print(df.info())
+
+
+
+
+
+#STEP 3: CLEAN AND PREPARE THE DATA
+# Drop rows with missing target values
+df = df.dropna(subset=['PRICE'])
+
+# Define features (X) and target (y)
+X = df.drop('PRICE', axis=1)
+y = df['PRICE']
+
+# Fill missing values in categorical columns with "Unknown"
+categorical_cols = ['START', 'STOP', 'PURPOSE', 'CATEGORY']
+for col in categorical_cols:
+    X[col] = X[col].fillna("Unknown")
+
+
+
+
+
+#STEP 4: ENCODE CATEGORICAL COLUMNS
+encoders = {}
+for col in categorical_cols:
+    le = LabelEncoder()
+    X[col] = le.fit_transform(X[col].astype(str))
+    encoders[col] = le
+
+
+
+
+#STEP 5: NORMALIZE NUMERICAL COLUMNS
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+
+#STEP 6: SPLIT INTO TRAIN/TEST SETS
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42
+)
+
+
+#STEP 7: BUILD THE NEUTRAL NETWORK MODEL
+model = keras.Sequential([
+    layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
+    layers.Dense(32, activation='relu'),
+    layers.Dense(1)  # Output: predicted price
+])
+
+model.compile(
+    optimizer='adam',
+    loss='mean_squared_error',
+    metrics=['mae', 'mse']
+)
+
+model.summary()
+
+
+#STEP 8: TRAIN THE MODEL (WITH EPOCHS)
+history = model.fit(
+    X_train, y_train,
+    validation_split=0.2,
+    epochs=100,
+    batch_size=32,
+    verbose=1
+)
+
+
+#STEP 9: EVALUATE PERFORMANCE ON TEST DATA
+test_loss, test_mae, test_mse = model.evaluate(X_test, y_test)
+print(f"\n✅ Test MAE: {test_mae:.2f}")
+print(f"✅ Test MSE: {test_mse:.2f}")
+
+
+#STEP 10: PLOT TRAINING PROGRESS
+plt.figure(figsize=(8,5))
+plt.plot(history.history['mae'], label='Train MAE')
+plt.plot(history.history['val_mae'], label='Validation MAE')
+plt.title('Training Progress')
+plt.xlabel('Epoch')
+plt.ylabel('Mean Absolute Error')
+plt.legend()
+plt.show()
